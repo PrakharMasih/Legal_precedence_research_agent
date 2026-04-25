@@ -1,0 +1,64 @@
+services:
+  # ── Redis cache ──────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --save "" --appendonly no --maxmemory 128mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+  # ── Qdrant vector database ─────────────────────────────────────────────────
+  qdrant:
+    image: qdrant/qdrant:v1.13.6
+    restart: unless-stopped
+    ports:
+      - "6333:6333"   # REST API + Web dashboard  →  http://localhost:6333/dashboard
+      - "6334:6334"   # gRPC
+    volumes:
+      - qdrant_data:/qdrant/storage
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c ':> /dev/tcp/localhost/6333'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ── FastAPI application ────────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      # Override embedded mode: connect to the qdrant service over the internal network
+      QDRANT_URL: http://qdrant:6333
+      REDIS_URL: redis://redis:6379
+      # Limit OpenBLAS threads to prevent memory allocation failures
+      OPENBLAS_NUM_THREADS: "2"
+      VECLIB_MAXIMUM_THREADS: "2"
+      MKL_NUM_THREADS: "2"
+    mem_limit: 2g
+    memswap_limit: 2g
+    volumes:
+      # Judgement PDFs: bind-mount from host so you can add files without rebuilding
+      - ./judgement_pdfs:/app/judgement_pdfs
+      # SQLite database: persisted in a named volume
+      - lexi_data:/app/data
+    depends_on:
+      qdrant:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  qdrant_data:   # Qdrant index storage
+  lexi_data:     # SQLite database (lexi.db)

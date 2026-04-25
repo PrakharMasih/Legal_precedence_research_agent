@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+
+# Virtual environment
+.venv/
+
+# Local data (volumes handle persistence in Docker)
+data/
+
+# Test and dev artefacts
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+tests/
+
+# Specs / documentation
+specs/
+*.md
+
+# Git
+.git/
+.github/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+
+# Secrets (env is passed via env_file / environment in compose)
+.env
+
+# Misc
+.specify/
+# uv.lock is intentionally NOT excluded — needed by Dockerfile for reproducible builds
