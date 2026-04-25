@@ -12,7 +12,7 @@ Legal precedent research assistant built on a **dynamic tool-calling agent archi
 
 - **Agent autonomy**: LLM dynamically selects search strategies—no hardcoded pipeline
 - **Accuracy over speed**: Hybrid retrieval (RRF-fused dense + sparse) > fast but imprecise vector-only search
-- **Single-server simplicity**: SQLite + ChromaDB (embedded, zero infrastructure) for v1
+- **Single-server simplicity**: SQLite + QdrantDB (embedded, zero infrastructure) for v1
 - **Hierarchical chunking**: Large context windows for reasoning + small retrieval units for precision
 
 This ADR documents **why** these choices were made, **what tradeoffs** were accepted, and **how the system would evolve** under different constraints.
@@ -45,7 +45,7 @@ This ADR documents **why** these choices were made, **what tradeoffs** were acce
 │  └────────────────────────────────────────────────────────┘   │
 │                 │                      │                      │
 │      ┌──────────▼──────────┐  ┌────────▼─────────┐            │
-│      │   SQLite (aiosqlite)│  │ ChromaDB (Vector)│            │
+│      │   SQLite (aiosqlite)│  │ QdrantDB (Vector)│            │
 │      │  • metadata         │  │ • embeddings     │            │
 │      │  • chunk text       │  │ • dense search   │            │
 │      │  • FTS5 index       │  │                  │            │
@@ -67,12 +67,12 @@ This ADR documents **why** these choices were made, **what tradeoffs** were acce
 #### 1. **Ingestion** (One-time or batch)
 ```
 PDF corpus → Parser (pdfplumber) → Chunker (spaCy-aware) → Embedder 
-  → Storage (SQLite + ChromaDB + FTS5 index)
+  → Storage (SQLite + QdrantDB + FTS5 index)
 ```
 
 #### 2. **Retrieval** (Per query)
 ```
-User Query → DenseRetriever (ChromaDB) + SparseRetriever (SQLite FTS5) 
+User Query → DenseRetriever (QdrantDB) + SparseRetriever (SQLite FTS5) 
   → RRF Fusion (Reciprocal Rank Fusion, k=60) → Top-k Ranked Chunks
   → Parent Context Expansion
 ```
@@ -121,7 +121,7 @@ Query → Is Conversational? (heuristic patterns)
 ### B. Retrieval Strategy: Hybrid Dense + Sparse with RRF Fusion
 
 **Decision**: 
-- **Dense retrieval** (ChromaDB + `all-MiniLM-L6-v2` embeddings, 384-dim)
+- **Dense retrieval** (QdrantDB + `all-MiniLM-L6-v2` embeddings, 384-dim)
 - **Sparse retrieval** (SQLite FTS5 with BM25 ranking)
 - **Merge** via Reciprocal Rank Fusion (k=60)
 
@@ -289,12 +289,12 @@ if any(w in query for w in {"strategy", "precedent", "adverse", "support our cas
 
 ---
 
-### Tradeoff 2: SQLite + ChromaDB (Two Backends) vs MongoDB Atlas Vector Search
+### Tradeoff 2: SQLite + QdrantDB (Two Backends) vs MongoDB Atlas Vector Search
 
 | Aspect | Embedded (Chosen) | MongoDB Atlas (Rejected) |
 |---|---|---|
 | BM25 support | ✓ SQLite FTS5 | ✗ ($search operator, different API) |
-| Vector search | ✓ ChromaDB | ✓ Atlas Vector Search |
+| Vector search | ✓ QdrantDB | ✓ Atlas Vector Search |
 | Setup time | 2 minutes (local) | 30 minutes (cloud account, VPC, credentials) |
 | Consistency guarantee | ACID (SQLite) | Eventual (Atlas) |
 | Backup complexity | `cp lexi.db backup/` | AWS snapshot + replication config |
@@ -303,7 +303,7 @@ if any(w in query for w in {"strategy", "precedent", "adverse", "support our cas
 **Justified for v1** because:
 - Spec explicitly prioritises simplicity (Constitution Principle V).
 - FTS5 is battle-tested, built into Python's sqlite3 (zero dependency).
-- ChromaDB handles dense search adequately for this corpus size.
+- QdrantDB handles dense search adequately for this corpus size.
 - Single-server v1 doesn't need cloud resilience features.
 
 **Migration path**: Repositories layer (`storage/repositories.py`) abstracts storage; swapping backends requires only changing one module.
@@ -352,7 +352,7 @@ if any(w in query for w in {"strategy", "precedent", "adverse", "support our cas
 | Chunks | ~2,500 | ~250,000 | Vector index size |
 | Vector index size (384-dim) | ~15 MB | ~1.5 GB | Single-node storage |
 | Embedding time (ingestion) | 10 seconds | 20–30 minutes | CPU (even with batching) |
-| Dense search latency | ~150 ms | ~300 ms (+ index load) | ChromaDB query time grows with index size |
+| Dense search latency | ~150 ms | ~300 ms (+ index load) | QdrantDB query time grows with index size |
 | SQLite FTS5 query latency | ~50 ms | ~200 ms | BM25 ranking over 250k docs |
 | Synthesis LLM latency | ~8 seconds | ~10 seconds | Token count (larger context window) |
 | **Typical query response** | **≤ 90s** | **≤ 180s** | Agent loops + synthesis latency |
@@ -360,7 +360,7 @@ if any(w in query for w in {"strategy", "precedent", "adverse", "support our cas
 ### Architectural Changes Needed at 5,000 Documents
 
 #### 1. **Distributed Vector Search**
-**Problem**: ChromaDB embedding index (~1.5 GB) + query latency → becomes bottleneck.
+**Problem**: QdrantDB embedding index (~1.5 GB) + query latency → becomes bottleneck.
 
 **Solution**: Migrate to managed vector database.
 - **Option A**: MongoDB Atlas Vector Search ($57–300/month, depending on tier)
@@ -368,7 +368,7 @@ if any(w in query for w in {"strategy", "precedent", "adverse", "support our cas
 
 **Implementation**:
 ```python
-# Current (SQLite FTS5 + ChromaDB)
+# Current (SQLite FTS5 + QdrantDB)
 retriever = Retriever(session_factory, vector_store, embedder)
 
 # Future (MongoDB Atlas Vector Search)
@@ -402,7 +402,7 @@ sparse_retriever = SparseRetriever(
 **Solution**: 
 - Pre-allocate embedding workers (e.g., `max_workers=8` ThreadPoolExecutor).
 - Batch encode chunks in groups of 128.
-- Stream embeddings to ChromaDB in batches.
+- Stream embeddings to QdrantDB in batches.
 
 ```python
 async def batch_embed(chunks, batch_size=128):
@@ -582,14 +582,14 @@ AI prioritises **accuracy and transparency** over raw speed:
 
 - **Accuracy**: Hybrid retrieval (RRF) beats either dense-only or sparse-only.
 - **Transparency**: Every tool call and reasoning step is logged and auditable.
-- **Simplicity**: Single-server embedded stack (SQLite + ChromaDB) eliminates DevOps burden for v1.
+- **Simplicity**: Single-server embedded stack (SQLite + QdrantDB) eliminates DevOps burden for v1.
 - **Autonomy**: LLM-driven agent workflow handles diverse queries without hardcoded branching.
 
 ### Migration Path to Scale
 
 | Phase | Corpus Size | Architecture |
 |---|---|---|
-| **v1 (Current)** | 50–100 docs | SQLite + ChromaDB (embedded) |
+| **v1 (Current)** | 50–100 docs | SQLite + QdrantDB (embedded) |
 | **v2** | 500–5k docs | PostgreSQL FTS + MongoDB Atlas Vector Search |
 | **v3** | 5k–100k docs | Elasticsearch + Pinecone / Weaviate |
 | **v4** | 100k+ docs | Multi-region distributed (SaaS) |
