@@ -19,7 +19,11 @@ A legal precedent research agent for Indian court judgments. This backend servic
 # Architecture Decision Record (ADR)
 ## Legal Precedent Research Agent — Design Rationale & Strategic Choices
 
+<img width="12359" height="4883" alt="HLD" src="https://github.com/user-attachments/assets/66aee9d8-d748-4a85-82dd-e22f46fd6356" />
+
 **Scope**: Core agent architecture, retrieval strategy, query routing, scalability path  
+
+<img width="2183" height="2238" alt="HLD_Overview" src="https://github.com/user-attachments/assets/1b6ca255-cfbc-4ca9-826d-c08fb0641a11" />
 
 ---
 
