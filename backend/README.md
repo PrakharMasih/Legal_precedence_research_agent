@@ -16,11 +16,10 @@ A legal precedent research agent for Indian court judgments. This backend servic
 - [Research Notes](research.md)
 
 
-# Architecture Decision Record (ADR) 001
+# Architecture Decision Record (ADR)
 ## Legal Precedent Research Agent — Design Rationale & Strategic Choices
 
 **Scope**: Core agent architecture, retrieval strategy, query routing, scalability path  
-**Related Documents**: [spec.md](specs/001-legal-precedent-research-agent/spec.md) | [plan.md](specs/001-legal-precedent-research-agent/plan.md) | [data-model.md](specs/001-legal-precedent-research-agent/data-model.md)
 
 ---
 
