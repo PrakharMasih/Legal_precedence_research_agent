@@ -6,12 +6,8 @@ This repository contains the Legal Precedent Research Agent project.
 
 See the [Architecture Decision Record](backend/README.md) for detailed backend documentation, features, and architecture.
 
-[Google Drive Resource](https://drive.google.com/file/d/1muOc7Lz0oGkE38J15wVW2s3Up-X9orfx/view?usp=drivesdk)
-
-<!-- YouTube Demo Video -->
-<iframe width="560" height="315" src="https://www.youtube.com/embed/saXXv8G1e6o" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-
-
+[Preview](https://www.youtube.com/embed/saXXv8G1e6o)
+[<img width="1918" height="876" alt="Screenshot 2026-04-25 073741" src="https://github.com/user-attachments/assets/dd3c7957-fbe4-46a9-ade1-61e5911009c8" />](https://www.youtube.com/embed/saXXv8G1e6o)
 
 ---
 
