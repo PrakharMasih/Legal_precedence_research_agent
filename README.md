@@ -8,6 +8,11 @@ See the [Architecture Decision Record](backend/README.md) for detailed backend d
 
 [Google Drive Resource](https://drive.google.com/file/d/1muOc7Lz0oGkE38J15wVW2s3Up-X9orfx/view?usp=drivesdk)
 
+<!-- YouTube Demo Video -->
+<iframe width="560" height="315" src="https://www.youtube.com/embed/saXXv8G1e6o" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+
+
+
 ---
 
 ## Project Structure
