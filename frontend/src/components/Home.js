@@ -58,29 +58,29 @@ const Home = () => {
           sources_searched: msg.sources_searched,
           processing_time_ms: msg.processing_time_ms,
         });
-        
+
         // Update thinking steps with completion marker
         setCurrentThinkingSteps((prev) => {
           const completedSteps = [...prev, { type: 'completed', message_id: msg.message_id }];
           console.log('Thinking steps completed:', completedSteps.length, 'steps');
-          
+
           // Store reference to completed steps for use in async callback
           const stepsToAttach = completedSteps;
-          
+
           // Fetch full history to get structured response and attach thinking steps
           (async () => {
             try {
               const updatedMessages = await fetchAndUpdateChatHistory();
               console.log('Fetched chat history:', updatedMessages.length, 'messages');
-              
+
               // Find the assistant message that was just completed
               const assistantMessage = updatedMessages.find(
                 (m) => m.id === msg.message_id || m.message_id === msg.message_id
               );
-              
+
               console.log('Looking for message with id:', msg.message_id);
               console.log('Found assistant message:', !!assistantMessage, assistantMessage?.id || assistantMessage?.message_id);
-              
+
               // Attach thinking steps to the message
               if (assistantMessage) {
                 setChats((prevChats) => {
@@ -103,7 +103,7 @@ const Home = () => {
               setIsLoading(false);
             }
           })();
-          
+
           return completedSteps;
         });
         break;
@@ -131,7 +131,7 @@ const Home = () => {
   }, []);
 
   const { connect, send, isConnected, isConnecting } = useWebSocket(
-    'ws://localhost:8001/ws/query',
+    process.env.REACT_APP_WS_URL || 'ws://localhost:8001/ws/query',
     handleWebSocketMessage,
     handleWebSocketError
   );
@@ -277,8 +277,8 @@ const Home = () => {
           {chats.map((msg, index) => {
             const thinkingKey = `${msg.id}-${index}`;
             const isThinkingExpanded = expandedThinking[thinkingKey] !== false;
+
             const assistantMsg = msg.role === 'assistant' ? msg : chats[index + 1];
-            const userMsg = msg.role === 'user' ? msg : null;
 
             // Only render pairs of user + assistant messages
             if (msg.role !== 'user') return null;
@@ -333,10 +333,10 @@ const Home = () => {
                       <div className="bg-white border border-gray-200 text-gray-900 p-4 rounded-lg shadow-sm">
                         <ReactMarkdown
                           components={{
-                            h1: ({ node, ...props }) => <h1 className="text-2xl font-bold mb-3 mt-4 text-gray-900" {...props} />,
-                            h2: ({ node, ...props }) => <h2 className="text-xl font-bold mb-2 mt-3 text-gray-900" {...props} />,
-                            h3: ({ node, ...props }) => <h3 className="text-lg font-semibold mb-2 mt-2 text-gray-800" {...props} />,
-                            h4: ({ node, ...props }) => <h4 className="text-base font-semibold mb-1 mt-2 text-gray-800" {...props} />,
+                            h1: ({ node, ...props }) => <h1 className="text-2xl font-bold mb-3 mt-4 text-gray-900" {...props}>{props.children && props.children.length > 0 ? props.children : 'Heading'}</h1>,
+                            h2: ({ node, ...props }) => <h2 className="text-xl font-bold mb-2 mt-3 text-gray-900" {...props}>{props.children && props.children.length > 0 ? props.children : 'Heading'}</h2>,
+                            h3: ({ node, ...props }) => <h3 className="text-lg font-semibold mb-2 mt-2 text-gray-800" {...props}>{props.children && props.children.length > 0 ? props.children : 'Heading'}</h3>,
+                            h4: ({ node, ...props }) => <h4 className="text-base font-semibold mb-1 mt-2 text-gray-800" {...props}>{props.children && props.children.length > 0 ? props.children : 'Heading'}</h4>,
                             p: ({ node, ...props }) => <p className="mb-2 text-gray-700" {...props} />,
                             ul: ({ node, ...props }) => <ul className="list-disc list-inside mb-2 space-y-1 text-gray-700" {...props} />,
                             ol: ({ node, ...props }) => <ol className="list-decimal list-inside mb-2 space-y-1 text-gray-700" {...props} />,
@@ -348,7 +348,7 @@ const Home = () => {
                                 <code className="bg-gray-100 px-2 py-1 rounded text-red-600 font-mono text-sm" {...props} /> :
                                 <code className="bg-gray-100 p-2 rounded block overflow-x-auto text-sm font-mono mb-2" {...props} />,
                             blockquote: ({ node, ...props }) => <blockquote className="border-l-4 border-indigo-500 pl-4 italic text-gray-600 my-2" {...props} />,
-                            a: ({ node, ...props }) => <a className="text-indigo-600 hover:text-indigo-800 underline" {...props} />,
+                            a: ({ node, ...props }) => <a className="text-indigo-600 hover:text-indigo-800 underline" {...props}>{props.children && props.children.length > 0 ? props.children : 'Link'}</a>,
                             hr: ({ node, ...props }) => <hr className="my-4 border-gray-300" {...props} />,
                           }}
                         >
@@ -422,10 +422,10 @@ const Home = () => {
                     <div className="bg-white border border-gray-200 text-gray-900 p-4 rounded-lg shadow-sm">
                       <ReactMarkdown
                         components={{
-                          h1: ({ node, ...props }) => <h1 className="text-2xl font-bold mb-3 mt-4 text-gray-900" {...props} />,
-                          h2: ({ node, ...props }) => <h2 className="text-xl font-bold mb-2 mt-3 text-gray-900" {...props} />,
-                          h3: ({ node, ...props }) => <h3 className="text-lg font-semibold mb-2 mt-2 text-gray-800" {...props} />,
-                          h4: ({ node, ...props }) => <h4 className="text-base font-semibold mb-1 mt-2 text-gray-800" {...props} />,
+                          h1: ({ node, ...props }) => <h1 className="text-2xl font-bold mb-3 mt-4 text-gray-900" {...props}>{props.children && props.children.length > 0 ? props.children : 'Heading'}</h1>,
+                          h2: ({ node, ...props }) => <h2 className="text-xl font-bold mb-2 mt-3 text-gray-900" {...props}>{props.children && props.children.length > 0 ? props.children : 'Heading'}</h2>,
+                          h3: ({ node, ...props }) => <h3 className="text-lg font-semibold mb-2 mt-2 text-gray-800" {...props}>{props.children && props.children.length > 0 ? props.children : 'Heading'}</h3>,
+                          h4: ({ node, ...props }) => <h4 className="text-base font-semibold mb-1 mt-2 text-gray-800" {...props}>{props.children && props.children.length > 0 ? props.children : 'Heading'}</h4>,
                           p: ({ node, ...props }) => <p className="mb-2 text-gray-700" {...props} />,
                           ul: ({ node, ...props }) => <ul className="list-disc list-inside mb-2 space-y-1 text-gray-700" {...props} />,
                           ol: ({ node, ...props }) => <ol className="list-decimal list-inside mb-2 space-y-1 text-gray-700" {...props} />,
@@ -437,7 +437,7 @@ const Home = () => {
                               <code className="bg-gray-100 px-2 py-1 rounded text-red-600 font-mono text-sm" {...props} /> :
                               <code className="bg-gray-100 p-2 rounded block overflow-x-auto text-sm font-mono mb-2" {...props} />,
                           blockquote: ({ node, ...props }) => <blockquote className="border-l-4 border-indigo-500 pl-4 italic text-gray-600 my-2" {...props} />,
-                          a: ({ node, ...props }) => <a className="text-indigo-600 hover:text-indigo-800 underline" {...props} />,
+                          a: ({ node, ...props }) => <a className="text-indigo-600 hover:text-indigo-800 underline" {...props}>{props.children && props.children.length > 0 ? props.children : 'Link'}</a>,
                           hr: ({ node, ...props }) => <hr className="my-4 border-gray-300" {...props} />,
                         }}
                       >
