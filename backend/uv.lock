@@ -1578,7 +1578,7 @@ wheels = [
 ]
 
 [[package]]
-name = "lexi-legal-precedent-agent"
+name = "Casey-legal-precedent-agent"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

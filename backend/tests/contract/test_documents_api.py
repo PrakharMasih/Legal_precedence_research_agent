@@ -37,7 +37,7 @@ async def indexed_app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         "A commercial vehicle caused a fatal accident. The driver had no valid licence.",
     )
 
-    monkeypatch.setenv("SQLITE_DB_PATH", str(tmp_path / "lexi.db"))
+    monkeypatch.setenv("SQLITE_DB_PATH", str(tmp_path / "casey.db"))
     monkeypatch.setenv("QDRANT_PATH", str(tmp_path / "qdrant"))
     monkeypatch.setenv("CORPUS_DIR", str(corpus_dir))
     monkeypatch.setenv("LLM_API_KEY", "test-key")

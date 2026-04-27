@@ -52,7 +52,7 @@ services:
       # Judgement PDFs: bind-mount from host so you can add files without rebuilding
       - ./judgement_pdfs:/app/judgement_pdfs
       # SQLite database: persisted in a named volume
-      - lexi_data:/app/data
+      - casey_data:/app/data
     depends_on:
       qdrant:
         condition: service_healthy
@@ -61,4 +61,4 @@ services:
 
 volumes:
   qdrant_data:   # Qdrant index storage
-  lexi_data:     # SQLite database (lexi.db)
+  casey_data:    # SQLite database (casey.db)

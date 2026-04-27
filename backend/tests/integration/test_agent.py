@@ -102,7 +102,7 @@ async def test_agent_returns_research_and_general_shapes(
         "The insurer remained liable despite the licence breach.",
     )
 
-    engine = create_db_engine(tmp_path / "lexi.db")
+    engine = create_db_engine(tmp_path / "casey.db")
     await init_schema(engine)
     session_factory = make_session_factory(engine)
     document_repository = DocumentRepository(session_factory)

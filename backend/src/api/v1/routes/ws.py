@@ -1,18 +1,18 @@
 """WebSocket endpoint for real-time agentic research.
 
 Protocol (server → client):
-    {"type": "thinking",    "step": N, "message": "..."}
-    {"type": "llm_thinking","step": N, "message": "..."}
-    {"type": "tool_call",   "step": N, "tool": "...", "args": {...}}
-    {"type": "tool_result", "step": N, "tool": "...", ...}
-    {"type": "synthesizing","step": N, "message": "...", "unique_documents": [...]}
-    {"type": "classifying", "step": N, "message": "..."}
-    {"type": "query_type",  "step": N, "is_research": bool, "message": "..."}
-    {"type": "reasoning",   "step": N, "message": "..."}
-    {"type": "streaming",   "step": N, "message": "..."}
-    {"type": "stream_chunk",           "content": "..."}   ← many, no step
-    {"type": "completed",  "message_id": "...", "query_type": "...", "sources_searched": N}
-    {"type": "error",      "error_code": "...", "message": "..."}
+    {"type": "agent_started", "correlation_id": "...", "message": "..."}  ← sent before pipeline
+    {"type": "thinking",     "step": N, "phase": "planning|retrieval|reflection", "message": "..."}
+    {"type": "tool_result",  "step": N, "tool": "search_corpus", "query": "...",
+                              "total_returned": N, "top_results": [...]}
+    {"type": "reasoning",    "step": N, "message": "...", "issue": "...",
+                              "rules_count": N, "precedent_strengths": {...}}
+    {"type": "synthesizing", "step": N, "message": "...", "unique_documents": [...]}
+    {"type": "query_type",   "step": N, "is_research": bool, "message": "..."}
+    {"type": "streaming",    "step": N, "message": "..."}
+    {"type": "stream_chunk",             "content": "..."}   ← many, no step
+    {"type": "completed",   "message_id": "...", "query_type": "...", "sources_searched": N}
+    {"type": "error",       "error_code": "...", "message": "..."}
 
 Client → server:
     {"query": "...", "mode": "auto|research|general"}
@@ -217,6 +217,16 @@ async def ws_query(websocket: WebSocket) -> None:
                     extra={"correlation_id": correlation_id, "event_type": event.get("type")},
                 )
                 # Don't re-raise; client may be temporarily unavailable
+
+        # Signal client before the pipeline starts — lets the frontend mount the
+        # thinking-process panel so it captures step 1 (planning) without a race condition.
+        await websocket.send_json(
+            {
+                "type": "agent_started",
+                "correlation_id": correlation_id,
+                "message": "Agent initialized — starting research pipeline…",
+            }
+        )
 
         # Run agent with streaming
         force_mode: str | None = None if mode == "auto" else mode

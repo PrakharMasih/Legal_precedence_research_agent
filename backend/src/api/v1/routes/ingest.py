@@ -1,22 +1,26 @@
+"""Document ingestion endpoints."""
+
 from __future__ import annotations
 
 import asyncio
-from datetime import UTC, datetime
-from uuid import uuid4
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
-from src.api.v1.schemas import ErrorResponse, IngestAccepted, IngestionReport, IngestRequest
+from src.api.v1.schemas import IngestAccepted, IngestionReport, IngestRequest
+from src.constants import (
+    ERROR_CODE_INGESTION_IN_PROGRESS,
+    ERROR_CODE_INGESTION_RUN_NOT_FOUND,
+    ERROR_MSG_INGESTION_IN_PROGRESS,
+    ERROR_MSG_INGESTION_RUN_NOT_FOUND,
+    STATUS_RUNNING,
+)
 from src.core.logging import get_logger
 from src.core.runtime import ensure_runtime
+from src.utils.responses import build_error_response, get_correlation_id_from_headers
 
 router = APIRouter(prefix="/ingest", tags=["ingest"])
 logger = get_logger(component="api.ingest")
-
-
-def _timestamp() -> str:
-    return datetime.now(UTC).isoformat()
 
 
 def _log_ingestion_task_completion(
@@ -25,6 +29,7 @@ def _log_ingestion_task_completion(
     run_id: str,
     corpus_dir: str,
 ) -> None:
+    """Log the result of an ingestion background task."""
     if task.cancelled():
         logger.warning(
             "api.ingest.background_task_cancelled",
@@ -51,113 +56,128 @@ def _log_ingestion_task_completion(
     )
 
 
-def _error_response(
-    *,
-    correlation_id: str,
-    status_code: int,
-    error_code: str,
-    message: str,
-) -> JSONResponse:
-    payload = ErrorResponse(
-        correlation_id=correlation_id,
-        error_code=error_code,
-        message=message,
-        timestamp=_timestamp(),
-    )
-    return JSONResponse(status_code=status_code, content=payload.model_dump())
-
-
 @router.post("", response_model=IngestAccepted, status_code=202)
 async def trigger_ingestion(
     request: Request,
     payload: IngestRequest,
 ) -> IngestAccepted | JSONResponse:
+    """
+    Trigger document ingestion.
+
+    Starts an asynchronous ingestion run to process PDFs from the corpus directory.
+    Returns immediately with a run ID for tracking progress.
+
+    Args:
+        request: FastAPI request object.
+        payload: IngestRequest with optional corpus_dir override.
+
+    Returns:
+        IngestAccepted response with run_id and status.
+
+    Raises:
+        HTTP 409 if an ingestion run is already active.
+    """
     runtime = await ensure_runtime(request.app)
-    correlation_id = request.headers.get("X-Correlation-ID", str(uuid4()))
+    ingestion_service = runtime.ingestion_service
+    correlation_id = get_correlation_id_from_headers(dict(request.headers))
+
     requested_corpus_dir = payload.corpus_dir or str(runtime.settings.corpus_dir)
+
     logger.info(
         "api.ingest.request_received",
         correlation_id=correlation_id,
         corpus_dir=requested_corpus_dir,
     )
-    active_run = await runtime.ingestion_run_repository.get_active_run()
-    if active_run is not None:
+
+    try:
+        run_id, _ = await ingestion_service.start_ingestion(requested_corpus_dir)
+    except ValueError as exc:
         logger.warning(
             "api.ingest.request_rejected_active_run",
             correlation_id=correlation_id,
             requested_corpus_dir=requested_corpus_dir,
-            active_run_id=active_run["id"],
+            error=str(exc),
         )
-        return _error_response(
+        return build_error_response(
             correlation_id=correlation_id,
             status_code=409,
-            error_code="INGESTION_IN_PROGRESS",
-            message=(
-                "An ingestion run is already running. Check the existing run status"
-                " before starting another."
-            ),
+            error_code=ERROR_CODE_INGESTION_IN_PROGRESS,
+            message=ERROR_MSG_INGESTION_IN_PROGRESS,
         )
 
-    run_id = str(uuid4())
-    corpus_dir = requested_corpus_dir
-    await runtime.ingestion_run_repository.create(
-        {
-            "id": run_id,
-            "corpus_dir": corpus_dir,
-            "started_at": _timestamp(),
-            "status": "running",
-        }
-    )
-    task = asyncio.create_task(runtime.ingestion_pipeline.run(corpus_dir, run_id))
+    # Schedule background ingestion task
+    task = asyncio.create_task(ingestion_service.execute_ingestion(requested_corpus_dir, run_id))
     request.app.state.ingestion_tasks[run_id] = task
+
     logger.info(
         "api.ingest.run_accepted",
         correlation_id=correlation_id,
         run_id=run_id,
-        corpus_dir=corpus_dir,
+        corpus_dir=requested_corpus_dir,
     )
 
     def _cleanup(background_task: asyncio.Task[None]) -> None:
+        """Clean up after background task completion."""
         request.app.state.ingestion_tasks.pop(run_id, None)
         _log_ingestion_task_completion(
             task=background_task,
             run_id=run_id,
-            corpus_dir=corpus_dir,
+            corpus_dir=requested_corpus_dir,
         )
 
     task.add_done_callback(_cleanup)
+
     return IngestAccepted(
         correlation_id=correlation_id,
         run_id=run_id,
-        status="running",
-        message=f"Ingestion started for {corpus_dir}",
+        status=STATUS_RUNNING,
+        message=f"Ingestion started for {requested_corpus_dir}",
     )
 
 
 @router.get("/{run_id}", response_model=IngestionReport)
 async def get_ingestion_status(run_id: str, request: Request) -> IngestionReport | JSONResponse:
+    """
+    Get status of an ingestion run.
+
+    Returns the current status, progress, and any failures for the ingestion run.
+
+    Args:
+        request: FastAPI request object.
+        run_id: ID of the ingestion run.
+
+    Returns:
+        IngestionReport with status and progress details.
+
+    Raises:
+        HTTP 404 if run_id is not found.
+    """
     runtime = await ensure_runtime(request.app)
-    correlation_id = request.headers.get("X-Correlation-ID", str(uuid4()))
+    ingestion_service = runtime.ingestion_service
+    correlation_id = get_correlation_id_from_headers(dict(request.headers))
+
     logger.info(
         "api.ingest.status_requested",
         correlation_id=correlation_id,
         run_id=run_id,
     )
-    run = await runtime.ingestion_run_repository.get_by_id(run_id)
+
+    run = await ingestion_service.get_run_status(run_id)
     if run is None:
         logger.warning(
             "api.ingest.status_not_found",
             correlation_id=correlation_id,
             run_id=run_id,
         )
-        return _error_response(
+        return build_error_response(
             correlation_id=correlation_id,
             status_code=404,
-            error_code="INGESTION_RUN_NOT_FOUND",
-            message=f"No ingestion run found for run_id={run_id}",
+            error_code=ERROR_CODE_INGESTION_RUN_NOT_FOUND,
+            message=ERROR_MSG_INGESTION_RUN_NOT_FOUND.format(run_id=run_id),
         )
 
     failures = await runtime.ingestion_failure_repository.get_by_run_id(run_id)
+
     logger.info(
         "api.ingest.status_returned",
         correlation_id=correlation_id,
@@ -167,6 +187,7 @@ async def get_ingestion_status(run_id: str, request: Request) -> IngestionReport
         succeeded=run["succeeded"],
         failed=run["failed"],
     )
+
     return IngestionReport(
         correlation_id=correlation_id,
         run_id=run["id"],

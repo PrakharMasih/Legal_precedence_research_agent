@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     llm_request_timeout: float = Field(default=60.0, alias="LLM_REQUEST_TIMEOUT")
     llm_max_retries: int = Field(default=5, alias="LLM_MAX_RETRIES")
     corpus_dir: Path = Field(default=Path("judgement_pdfs"), alias="CORPUS_DIR")
-    sqlite_db_path: Path = Field(default=Path("data/lexi.db"), alias="SQLITE_DB_PATH")
+    sqlite_db_path: Path = Field(default=Path("data/Casey.db"), alias="SQLITE_DB_PATH")
     # Qdrant – set QDRANT_URL (+ optionally QDRANT_API_KEY) for remote/cloud mode.
     # Leave unset to use embedded local storage at QDRANT_PATH (default: data/qdrant).
     qdrant_url: str | None = Field(default=None, alias="QDRANT_URL")

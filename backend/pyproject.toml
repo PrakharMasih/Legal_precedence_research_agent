@@ -1,6 +1,6 @@
 # Coverage baseline: 91% total line coverage from `pytest --cov=src --cov-report=term-missing` on 2026-04-23.
 [project]
-name = "lexi-legal-precedent-agent"
+name = "Casey-legal-precedent-agent"
 version = "0.1.0"
 description = "Legal precedent research agent for Indian court judgments"
 requires-python = ">=3.11"

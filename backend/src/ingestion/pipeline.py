@@ -180,9 +180,10 @@ class IngestionPipeline:
                 await self.chunk_repository.delete_by_document_id(parsed.file_hash)
                 await self.chunk_repository.insert_batch(all_chunks)
 
-                # Vector-index only child chunks (with section + hierarchy metadata)
-                for child, embedding in zip(child_chunks, embeddings, strict=True):
-                    await self.vector_store.add_embeddings(
+                # Vector-index child chunks using batch upsert
+                # Build list of (chunk_id, embedding, metadata, content) tuples
+                embeddings_data = [
+                    (
                         child.id,
                         embedding,
                         {
@@ -198,6 +199,11 @@ class IngestionPipeline:
                         },
                         child.content,
                     )
+                    for child, embedding in zip(child_chunks, embeddings, strict=True)
+                ]
+                
+                # Batch upsert all embeddings at once (much faster than sequential)
+                await self.vector_store.add_embeddings_batch(embeddings_data)
 
                 if existing is not None and existing.status != "success":
                     await self.document_repository.update_status(parsed.file_hash, "success")

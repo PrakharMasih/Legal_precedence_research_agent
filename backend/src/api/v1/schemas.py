@@ -65,6 +65,8 @@ class QueryResponse(BaseModel):
     response: PrecedentAnalysis | GeneralQueryResponse
     sources_searched: int
     processing_time_ms: int
+    user_message_id: str
+    assistant_message_id: str
 
 
 class DocumentSummary(BaseModel):

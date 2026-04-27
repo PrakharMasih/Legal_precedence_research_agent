@@ -6,10 +6,10 @@ const PrecedentAnalysis = ({ response, queryType }) => {
     if (queryType === 'general_query') {
         return (
             <div className="space-y-4">
-                <div className="bg-white border border-gray-200 rounded-lg p-4">
+                {/* <div className="bg-white border border-gray-200 rounded-lg p-4">
                     <h3 className="font-semibold text-gray-900 mb-2">Answer</h3>
                     <p className="text-gray-700 text-sm leading-relaxed">{response.answer}</p>
-                </div>
+                </div> */}
 
                 {response.supporting_documents && response.supporting_documents.length > 0 && (
                     <div className="bg-white border border-gray-200 rounded-lg p-4">

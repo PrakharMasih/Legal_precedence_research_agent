@@ -52,7 +52,7 @@ async def test_ingestion_pipeline_processes_pdfs_and_records_failures(tmp_path: 
     )
     (corpus_dir / "doc_bad.pdf").write_bytes(b"not a real pdf")
 
-    database_path = tmp_path / "lexi.db"
+    database_path = tmp_path / "casey.db"
     engine = create_db_engine(database_path)
     await init_schema(engine)
     session_factory = make_session_factory(engine)
@@ -119,7 +119,7 @@ async def test_ingestion_pipeline_reprocesses_incomplete_success_documents(tmp_p
         "The insurer denied liability because the truck driver had no valid licence.",
     )
 
-    database_path = tmp_path / "lexi.db"
+    database_path = tmp_path / "casey.db"
     engine = create_db_engine(database_path)
     await init_schema(engine)
     session_factory = make_session_factory(engine)

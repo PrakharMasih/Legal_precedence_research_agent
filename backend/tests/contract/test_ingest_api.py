@@ -12,7 +12,7 @@ from src.main import create_app
 
 @pytest.fixture
 def test_app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setenv("SQLITE_DB_PATH", str(tmp_path / "lexi.db"))
+    monkeypatch.setenv("SQLITE_DB_PATH", str(tmp_path / "casey.db"))
     monkeypatch.setenv("QDRANT_PATH", str(tmp_path / "qdrant"))
     monkeypatch.setenv("CORPUS_DIR", str((Path.cwd() / "judgement_pdfs").resolve()))
     get_settings.cache_clear()

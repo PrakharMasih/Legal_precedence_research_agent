@@ -52,13 +52,13 @@ ENV PATH="/app/.venv/bin:$PATH" \
     MKL_NUM_THREADS=2
 
 # Create non-root user and hand over ownership
-RUN useradd --create-home --uid 1000 lexi \
-    && chown -R lexi:lexi /app
+RUN useradd --create-home --uid 1000 casey \
+    && chown -R casey:casey /app
 
-USER lexi
+USER casey
 
 # Copy application source code
-COPY --chown=lexi:lexi src/ ./src/
+COPY --chown=casey:casey src/ ./src/
 
 # Runtime data directories (overridden by Docker volumes in compose)
 RUN mkdir -p data judgement_pdfs

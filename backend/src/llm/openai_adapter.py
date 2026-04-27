@@ -181,8 +181,19 @@ class OpenAIAdapter(LLMProvider):
             raise LLMUnavailableError("LLM call failed after all retries") from last_exc
 
         tool_calls = [self._serialize_tool_call(tc) for tc in response.tool_calls]
+        # Ensure content is always a string
+        if hasattr(response, "text") and isinstance(response.text, str):
+            content_str = response.text
+        else:
+            raw_content = response.content
+            if callable(raw_content):
+                content_str = ""
+            elif isinstance(raw_content, str):
+                content_str = raw_content
+            else:
+                content_str = str(raw_content) if raw_content else ""
         return LLMResponse(
-            content=response.text if hasattr(response, "text") else str(response.content or ""),
+            content=content_str,
             tool_calls=tool_calls,
             raw=response.model_dump(),
         )
@@ -221,7 +232,14 @@ class OpenAIAdapter(LLMProvider):
         converted: list[SystemMessage | HumanMessage | AIMessage | ToolMessage] = []
         for message in messages:
             role = message.get("role")
-            content = message.get("content", "") or ""
+            raw_content = message.get("content", "")
+            # Ensure content is always a string, not a callable or other type
+            if callable(raw_content):
+                content = ""
+            elif isinstance(raw_content, str):
+                content = raw_content
+            else:
+                content = str(raw_content) if raw_content else ""
             if role == "system":
                 converted.append(SystemMessage(content=content))
             elif role == "assistant":

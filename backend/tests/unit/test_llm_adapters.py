@@ -63,7 +63,7 @@ def test_llm_factory_returns_openai_adapter() -> None:
         LLM_MODEL="gpt-4o-mini",
         LLM_API_KEY="test-key",
         CORPUS_DIR="judgement_pdfs",
-        SQLITE_DB_PATH="data/lexi.db",
+        SQLITE_DB_PATH="data/casey.db",
     )
 
     adapter = LLMFactory.from_config(settings)
@@ -77,7 +77,7 @@ def test_llm_factory_returns_groq_adapter() -> None:
         LLM_MODEL="llama-3.3-70b-versatile",
         LLM_API_KEY="test-key",
         CORPUS_DIR="judgement_pdfs",
-        SQLITE_DB_PATH="data/lexi.db",
+        SQLITE_DB_PATH="data/casey.db",
     )
 
     adapter = LLMFactory.from_config(settings)
@@ -92,7 +92,7 @@ def test_llm_factory_raises_for_unknown_provider() -> None:
         LLM_MODEL="gpt-4o-mini",
         LLM_API_KEY="test-key",
         CORPUS_DIR="judgement_pdfs",
-        SQLITE_DB_PATH="data/lexi.db",
+        SQLITE_DB_PATH="data/casey.db",
     )
 
     with pytest.raises(ValueError):

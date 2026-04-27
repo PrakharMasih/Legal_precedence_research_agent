@@ -1,62 +1,61 @@
-from __future__ import annotations
+"""Legal research query endpoints."""
 
-from datetime import UTC, datetime
-from typing import Any
-from uuid import uuid4
+from __future__ import annotations
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
-from src.agent.agent import LegalResearchAgent
-from src.agent.tools import ResearchToolbox
 from src.api.v1.schemas import ErrorResponse, QueryRequest, QueryResponse
+from src.constants import ERROR_CODE_CORPUS_NOT_INDEXED, ERROR_CODE_LLM_UNAVAILABLE
 from src.core.exceptions import CorpusNotIndexedError, LLMUnavailableError
 from src.core.runtime import ensure_runtime
-from src.models.conversation import Message
-from src.retrieval.retriever import Retriever
+from src.utils.responses import get_correlation_id_from_headers
+from src.utils.timestamps import timestamp_iso
 
 router = APIRouter(prefix="/query", tags=["query"])
 
 
-def _timestamp() -> str:
-    return datetime.now(UTC).isoformat()
-
-
-def _build_agent(runtime: Any) -> tuple[LegalResearchAgent, Any]:
-    retriever = Retriever(
-        session_factory=runtime.session_factory,
-        vector_store=runtime.vector_store,
-        embedder=runtime.embedder,
-    )
-    toolbox = ResearchToolbox(
-        retriever=retriever,
-        document_repository=runtime.document_repository,
-        chunk_repository=runtime.chunk_repository,
-    )
-    return LegalResearchAgent(llm_provider=runtime.llm_provider, toolbox=toolbox), toolbox
-
-
 @router.post("", response_model=QueryResponse)
 async def submit_query(request: Request, payload: QueryRequest) -> QueryResponse | JSONResponse:
+    """
+    Execute a legal research query.
+
+    Processes the user's query through the autonomous legal research agent,
+    which decomposes the query, retrieves relevant precedents, and provides
+    analysis and recommendations.
+
+    Args:
+        request: FastAPI request object.
+        payload: QueryRequest with the user's query text.
+
+    Returns:
+        QueryResponse with agent findings and message IDs.
+
+    Raises:
+        HTTP 503 if LLM provider is unavailable.
+        HTTP 409 if corpus has not been indexed yet.
+    """
     runtime = await ensure_runtime(request.app)
-    correlation_id = request.headers.get("X-Correlation-ID", str(uuid4()))
-    now = datetime.now(UTC)
+    query_service = runtime.query_service
+    correlation_id = get_correlation_id_from_headers(dict(request.headers))
 
-    recent_messages = await runtime.chat_repository.get_recent_context()
-    history = [{"role": m.role, "content": m.content} for m in recent_messages]
-
-    agent, _ = _build_agent(runtime)
+    # Get recent conversation context for the LLM
+    history = await query_service.get_recent_context()
 
     try:
-        result = await agent.run(payload.query, correlation_id, history=history)
+        result = await query_service.execute_query(
+            query_text=payload.query,
+            correlation_id=correlation_id,
+            history=history,
+        )
     except LLMUnavailableError as exc:
         return JSONResponse(
             status_code=503,
             content=ErrorResponse(
                 correlation_id=correlation_id,
-                error_code="LLM_UNAVAILABLE",
+                error_code=ERROR_CODE_LLM_UNAVAILABLE,
                 message=str(exc),
-                timestamp=_timestamp(),
+                timestamp=timestamp_iso(),
             ).model_dump(),
         )
     except CorpusNotIndexedError as exc:
@@ -64,38 +63,19 @@ async def submit_query(request: Request, payload: QueryRequest) -> QueryResponse
             status_code=409,
             content=ErrorResponse(
                 correlation_id=correlation_id,
-                error_code="CORPUS_NOT_INDEXED",
+                error_code=ERROR_CODE_CORPUS_NOT_INDEXED,
                 message=str(exc),
-                timestamp=_timestamp(),
+                timestamp=timestamp_iso(),
             ).model_dump(),
         )
 
-    user_msg = Message(
-        id=str(uuid4()),
-        role="user",
-        content=payload.query,
-        query_type=result["query_type"],
-        sources_searched=result["sources_searched"],
-        created_at=now,
-    )
-    assistant_msg = Message(
-        id=str(uuid4()),
-        role="assistant",
-        content=result.get("chat_response") or "",
-        query_type=result["query_type"],
-        sources_searched=result["sources_searched"],
-        raw_response=result.get("response"),
-        agent_steps=result.get("agent_steps"),
-        created_at=datetime.now(UTC),
-    )
-    await runtime.chat_repository.append(user_msg)
-    await runtime.chat_repository.append(assistant_msg)
-
     return QueryResponse(
         correlation_id=correlation_id,
-        query_type=result["query_type"],
+        query_type=result.get("query_type", "unknown"),
         chat_response=result.get("chat_response", ""),
-        response=result["response"],
-        sources_searched=result["sources_searched"],
-        processing_time_ms=result["processing_time_ms"],
+        response=result.get("response"),
+        sources_searched=result.get("sources_searched", 0),
+        processing_time_ms=result.get("processing_time_ms", 0),
+        user_message_id=result.get("user_message_id", ""),
+        assistant_message_id=result.get("assistant_message_id", ""),
     )

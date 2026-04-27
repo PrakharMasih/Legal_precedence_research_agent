@@ -161,6 +161,9 @@ class ResearchToolbox:
         return {
             "document_id": result.document_id,
             "file_name": result.file_name,
-            "excerpt": result.content,
+            "case_name": result.case_name,
+            "section": result.section,
+            # Prefer parent-context window for richer LLM reasoning; fall back to child content
+            "excerpt": result.parent_content or result.content,
             "relevance_score": max(0.0, min(1.0, result.rrf_score * 100)),
         }

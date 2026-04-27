@@ -4,14 +4,14 @@ All operations are no-ops when Redis is not configured or unreachable —
 the application continues to function correctly, just without caching.
 
 Cache key namespaces:
-    lexi:chat:recent           – recent conversation context (20 s TTL)
-    lexi:chat:history:{l}:{o}  – paginated chat history (30 s TTL)
-    lexi:chat:count            – total message count (30 s TTL)
-    lexi:doc:{id}              – single document metadata (600 s TTL)
-    lexi:doc:list:{l}:{o}      – paginated document list (300 s TTL)
-    lexi:doc:count             – total document count (300 s TTL)
-    lexi:chunk:count:{doc_id}  – chunk count per document (600 s TTL)
-    lexi:chunk:list:{doc_id}   – chunk list per document (600 s TTL)
+    casey:chat:recent           – recent conversation context (20 s TTL)
+    casey:chat:history:{l}:{o}  – paginated chat history (30 s TTL)
+    casey:chat:count            – total message count (30 s TTL)
+    casey:doc:{id}              – single document metadata (600 s TTL)
+    casey:doc:list:{l}:{o}      – paginated document list (300 s TTL)
+    casey:doc:count             – total document count (300 s TTL)
+    casey:chunk:count:{doc_id}  – chunk count per document (600 s TTL)
+    casey:chunk:list:{doc_id}   – chunk list per document (600 s TTL)
 """
 
 from __future__ import annotations

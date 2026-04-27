@@ -9,7 +9,6 @@ from sqlalchemy import delete, insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.core.cache import (
-    CacheClient,
     TTL_CHAT_COUNT,
     TTL_CHAT_HISTORY,
     TTL_CHAT_RECENT,
@@ -18,6 +17,7 @@ from src.core.cache import (
     TTL_DOC,
     TTL_DOC_COUNT,
     TTL_DOC_LIST,
+    CacheClient,
 )
 from src.models.conversation import Message
 from src.models.document import Chunk, Document
@@ -59,17 +59,17 @@ class DocumentRepository:
 
     @staticmethod
     def _key_doc(document_id: str) -> str:
-        return f"lexi:doc:{document_id}"
+        return f"casey:doc:{document_id}"
 
     @staticmethod
     def _key_list(limit: int, offset: int) -> str:
-        return f"lexi:doc:list:{limit}:{offset}"
+        return f"casey:doc:list:{limit}:{offset}"
 
-    _KEY_COUNT = "lexi:doc:count"
+    _KEY_COUNT = "casey:doc:count"
 
     async def _invalidate_lists(self) -> None:
         """Remove all cached list pages and the count key."""
-        await self._cache.delete_pattern("lexi:doc:list:*")
+        await self._cache.delete_pattern("casey:doc:list:*")
         await self._cache.delete(self._KEY_COUNT)
 
     # -- queries -------------------------------------------------------------
@@ -191,11 +191,11 @@ class ChunkRepository:
 
     @staticmethod
     def _key_count(document_id: str) -> str:
-        return f"lexi:chunk:count:{document_id}"
+        return f"casey:chunk:count:{document_id}"
 
     @staticmethod
     def _key_list(document_id: str) -> str:
-        return f"lexi:chunk:list:{document_id}"
+        return f"casey:chunk:list:{document_id}"
 
     # -- mutations ----------------------------------------------------------
 
@@ -374,8 +374,8 @@ class IngestionFailureRepository:
 class ChatRepository:
     CONTEXT_WINDOW = 20
 
-    _KEY_RECENT = "lexi:chat:recent"
-    _KEY_COUNT = "lexi:chat:count"
+    _KEY_RECENT = "casey:chat:recent"
+    _KEY_COUNT = "casey:chat:count"
 
     def __init__(
         self,
@@ -388,12 +388,12 @@ class ChatRepository:
 
     @staticmethod
     def _key_history(limit: int, offset: int) -> str:
-        return f"lexi:chat:history:{limit}:{offset}"
+        return f"casey:chat:history:{limit}:{offset}"
 
     async def _invalidate_all(self) -> None:
         """Bust every chat cache entry — called on append and clear."""
         await self._cache.delete(self._KEY_RECENT, self._KEY_COUNT)
-        await self._cache.delete_pattern("lexi:chat:history:*")
+        await self._cache.delete_pattern("casey:chat:history:*")
 
     async def append(self, message: Message) -> None:
         async with self._sf() as session:

@@ -45,7 +45,7 @@ async def test_retriever_returns_ranked_chunks_from_indexed_corpus(tmp_path: Pat
         "The commercial vehicle owner contested compensation and negligence.",
     )
 
-    engine = create_db_engine(tmp_path / "lexi.db")
+    engine = create_db_engine(tmp_path / "casey.db")
     await init_schema(engine)
     session_factory = make_session_factory(engine)
     vector_store = VectorStore(path=tmp_path / "qdrant")
