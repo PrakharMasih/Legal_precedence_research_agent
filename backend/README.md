@@ -1,19 +1,521 @@
-# Legal Precedent Research Agent
+# Legal Precedent Research Agent (Casey)
 
-A legal precedent research agent for Indian court judgments. This backend service provides APIs for document ingestion, vector-based retrieval, and intelligent querying of legal documents using language models.
+**An autonomous legal research assistant for Indian court judgments**—built on a 5-node graph workflow that combines IRAC reasoning, hybrid semantic+keyword retrieval, and LLM-powered synthesis to provide precedent analysis, risk assessment, and litigation strategy.
 
-## Features
+## 🎯 Overview
 
-- Document ingestion and processing
-- Hybrid retrieval (dense + sparse)
-- Legal judgment querying
-- Real-time WebSocket support
-- Integration with language models for legal reasoning
+Casey helps legal professionals research precedents, build litigation strategies, and understand case risks by:
 
-## Documentation
+1. **Intelligent Querying**: Decomposes complex legal queries into targeted searches
+2. **Hybrid Retrieval**: Combines dense semantic search (QdrantDB) + sparse keyword search (SQLite FTS5) with RRF fusion
+3. **IRAC Reasoning**: Applies legal reasoning framework (Issue → Rules → Application → Conclusion)
+4. **Reflection Loop**: Confidence-driven refinement (re-searches if confidence < 0.6)
+5. **Structured Output**: Supports + adverse precedents + strategy recommendations + reasoning trace
 
-- [Chunking Strategy](chunking-strategy.md)
-- [Research Notes](research.md)
+## 🚀 Quick Start
+
+### Prerequisites
+
+- **Python 3.11+**
+- **pip** or **uv**
+- **LLM API Key** (OpenAI, Groq, or Azure OpenAI)
+- **PDF Corpus** (Indian court judgments in `judgement_pdfs/`)
+
+### Installation
+
+```bash
+# Clone and navigate to backend
+cd backend
+
+# Create virtual environment
+python -m venv .venv
+source .venv/bin/activate  # or `.venv\Scripts\Activate` on Windows
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Copy environment template
+cp .env.example .env
+
+# Edit .env with your configuration
+# - LLM_API_KEY=sk-... (required)
+# - LLM_PROVIDER=openai (or groq, azure)
+# - CORPUS_DIR=judgement_pdfs (path to PDF files)
+```
+
+### Configuration (.env)
+
+Copy `.env.example` to `.env` and update:
+
+```bash
+# ── LLM Provider (required) ────────────────────────────────────────────────
+LLM_PROVIDER=openai                    # 'openai', 'groq', or 'azure'
+LLM_MODEL=gpt-4o-mini                  # Model to use (e.g., gpt-4, gpt-4o-mini)
+LLM_API_KEY=sk-...                     # Your API key
+LLM_BASE_URL=https://api.openai.com/v1 # (optional) Override endpoint
+                                        # Groq: https://api.groq.com/openai/v1
+LLM_REQUEST_TIMEOUT=60.0               # (optional) Request timeout in seconds
+LLM_MAX_RETRIES=3                      # (optional) Number of retries on failure
+
+# ── Document Storage ──────────────────────────────────────────────────────
+CORPUS_DIR=judgement_pdfs              # Path to PDF files for ingestion
+SQLITE_DB_PATH=data/Casey.db           # SQLite database (metadata, FTS5 index)
+
+# ── Vector Store (Qdrant) ─────────────────────────────────────────────────
+# Local (embedded, no server needed): Leave QDRANT_URL unset
+QDRANT_URL=                            # (optional) For Qdrant Cloud or Docker Compose
+QDRANT_API_KEY=                        # (optional) For Qdrant Cloud with auth
+QDRANT_COLLECTION=judgments            # Collection name
+QDRANT_PATH=data/qdrant                # Local embedded data directory
+
+# ── Caching (Optional) ────────────────────────────────────────────────────
+REDIS_URL=redis://localhost:6379       # (optional) Enable caching; leave unset to disable
+
+# ── Logging ────────────────────────────────────────────────────────────────
+LOG_LEVEL=INFO                         # 'DEBUG', 'INFO', 'WARNING', 'ERROR'
+LOG_FORMAT=json                        # 'json' or 'text'
+
+# ── Server ────────────────────────────────────────────────────────────────
+HOST=0.0.0.0                           # Bind to all interfaces
+PORT=8000                              # Server port
+```
+
+### Running the Application
+
+```bash
+# Start the server
+python -m uvicorn src.main:app --reload
+
+# Server will listen on http://localhost:8000
+
+# Check health
+curl http://localhost:8000/health
+
+# View API docs
+open http://localhost:8000/docs  # Swagger UI
+open http://localhost:8000/redoc  # ReDoc
+```
+
+### Ingesting Documents
+
+```bash
+# Trigger ingestion of all PDFs in corpus_dir
+curl -X POST http://localhost:8000/api/v1/ingest \
+  -H "Content-Type: application/json" \
+  -d '{"corpus_dir": "judgement_pdfs"}'
+
+# Response: {"run_id": "uuid-xxx", "status": "running"}
+
+# Check ingestion progress
+curl http://localhost:8000/api/v1/ingest/uuid-xxx
+
+# Expected: When complete, {"status": "completed", "total_files": 50, "succeeded": 50, ...}
+```
+
+### Example Query
+
+```bash
+# Execute a legal research query
+curl -X POST http://localhost:8000/api/v1/query \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "Build a case for Mrs. Devi'\''s unlicensed driver insurance claim. What precedents support her position? What adverse precedents could the insurer raise?"
+  }'
+
+# Response includes:
+# - query_type: "precedent_research"
+# - supporting_precedents: [...]
+# - adverse_precedents: [...]
+# - strategy_recommendation: {...}
+# - chat_response: "Based on retrieved precedents..."
+```
+
+## 📚 Documentation
+
+| Document | Purpose |
+|----------|---------|
+| **[CODEBASE_GUIDE.md](CODEBASE_GUIDE.md)** | **→ START HERE** — Complete architecture, all workflows, data models, API reference |
+| [ADR_001_LEGAL_PRECEDENT_RESEARCH_AGENT.md](ADR_001_LEGAL_PRECEDENT_RESEARCH_AGENT.md) | Architecture Decision Record — why key design choices were made |
+| [chunking-strategy.md](chunking-strategy.md) | Hierarchical chunking strategy (section detection + parent/child hierarchy) |
+| [research.md](research.md) | Research notes and explorations |
+| [specs/001-legal-precedent-research-agent/](specs/001-legal-precedent-research-agent/) | Feature specifications and implementation planning |
+
+## 🏗️ Project Structure
+
+```
+backend/
+├── src/
+│   ├── main.py                          # FastAPI app factory
+│   ├── constants.py                     # App constants
+│   ├── api/v1/
+│   │   ├── routes/
+│   │   │   ├── query.py                 # POST /query
+│   │   │   ├── ingest.py                # POST /ingest
+│   │   │   ├── chat.py                  # GET /chat/history
+│   │   │   ├── documents.py             # GET /documents
+│   │   │   └── ws.py                    # WebSocket /ws/query
+│   │   ├── middleware/
+│   │   │   └── correlation_id.py        # Request tracing
+│   │   └── schemas.py                   # Pydantic models
+│   ├── agent/                           # 5-node graph orchestration
+│   │   ├── agent.py
+│   │   ├── graph/
+│   │   │   ├── workflow.py              # GraphWorkflow orchestration
+│   │   │   ├── state.py                 # AgentState (mutable context)
+│   │   │   └── nodes.py                 # 5 nodes: Planner, Retrieval, Reasoner, Reflector, Synthesis
+│   │   ├── tools.py                     # ResearchToolbox
+│   │   ├── prompts.py                   # LLM system prompts
+│   │   └── output_schemas.py            # IRAC, PlannerOutput, etc.
+│   ├── retrieval/
+│   │   ├── retriever.py                 # Public Retriever interface
+│   │   ├── dense.py                     # QdrantDB semantic search
+│   │   ├── sparse.py                    # SQLite FTS5 BM25 search
+│   │   └── hybrid.py                    # RRF fusion
+│   ├── ingestion/
+│   │   ├── pipeline.py                  # Orchestrates parse → chunk → embed → store
+│   │   ├── parser.py                    # PDF extraction
+│   │   ├── chunker.py                   # Hierarchical chunking
+│   │   └── embedder.py                  # Sentence embedding
+│   ├── llm/
+│   │   ├── base.py                      # LLMProvider protocol
+│   │   ├── factory.py                   # LLM factory
+│   │   └── openai_adapter.py            # OpenAI-compatible wrapper
+│   ├── services/
+│   │   ├── query_service.py             # Query execution orchestration
+│   │   ├── ingestion_service.py         # Ingestion orchestration
+│   │   ├── chat_service.py              # Chat history
+│   │   └── retrieval_service.py         # Retrieval wrapper
+│   ├── storage/
+│   │   ├── database.py                  # SQLite setup
+│   │   ├── repositories.py              # Data access layer
+│   │   └── vector_store.py              # QdrantDB wrapper
+│   ├── models/
+│   │   ├── document.py
+│   │   ├── query.py
+│   │   └── conversation.py
+│   └── core/
+│       ├── config.py                    # Settings (from .env)
+│       ├── runtime.py                   # Lazy-init singletons
+│       ├── exceptions.py                # Error hierarchy
+│       ├── logging.py                   # Structured logging
+│       └── cache.py                     # Redis cache
+├── tests/
+│   ├── unit/                            # Unit tests
+│   ├── integration/                     # Integration tests
+│   ├── eval/                            # Evaluation tests
+│   └── contract/                        # API contract tests
+├── evals/                               # Evaluation system
+│   ├── runner.py                        # Main evaluation entry point
+│   ├── evaluator.py                     # 4-dimension scoring (Precision, Recall, Reasoning, Adverse)
+│   ├── benchmark.py                     # 4 benchmark cases
+│   ├── schemas.py                       # Evaluation models
+│   ├── prompts.py                       # LLM judge prompts
+│   ├── EVAL_FLOW.md                     # Evaluation workflow
+│   └── results/                         # JSON reports
+├── requirements.txt
+├── pyproject.toml
+├── docker-compose.yml
+├── Dockerfile
+├── .env.example
+└── README.md (this file)
+```
+
+## 🔌 API Endpoints
+
+### Health Check
+
+**`GET /health`** — Check server status
+
+```bash
+curl http://localhost:8000/health
+```
+
+**Response** (200 OK):
+```json
+{"status": "ok"}
+```
+
+### Query Execution
+
+**`POST /api/v1/query`** — Execute a legal research query
+
+```bash
+curl -X POST http://localhost:8000/api/v1/query \
+  -H "Content-Type: application/json" \
+  -d '{"query": "Build a case for Mrs. Devi'\''s insurance claim"}'
+```
+
+**Response** (200 OK):
+```json
+{
+  "correlation_id": "uuid-xxx",
+  "query_type": "precedent_research",
+  "chat_response": "Based on retrieved precedents, your claim has strong support...",
+  "response": {
+    "supporting_precedents": [...],
+    "adverse_precedents": [...],
+    "strategy_recommendation": {...}
+  },
+  "sources_searched": 15,
+  "processing_time_ms": 45000
+}
+```
+
+### Document Ingestion
+
+**`POST /api/v1/ingest`** — Trigger corpus ingestion
+
+**`GET /api/v1/ingest/{run_id}`** — Check ingestion progress
+
+### Chat History
+
+**`GET /api/v1/chat/history?limit=50&offset=0`** — Retrieve conversation history
+
+### Document Management
+
+**`GET /api/v1/documents`** — List all indexed documents
+
+### WebSocket (Real-time)
+
+**`WS /ws/query`** — Stream agent reasoning steps and response in real-time
+
+```bash
+# Connect to WebSocket
+websocat ws://localhost:8000/ws/query
+
+# Send query as JSON
+{"query": "Build a case for Mrs. Devi's insurance claim", "mode": "auto"}
+
+# Receive real-time events
+# {"type": "agent_started", "correlation_id": "...", "message": "..."}
+# {"type": "thinking", "step": 1, "phase": "planning", "message": "..."}
+# {"type": "tool_result", "step": 1, "tool": "search_corpus", "total_returned": 5, ...}
+# {"type": "stream_chunk", "content": "Legal analysis..."}
+# {"type": "completed", "message_id": "...", "sources_searched": 15}
+```
+
+**Modes**:
+- `"auto"`: Automatically classify as research or general query
+- `"research"`: Force structured precedent analysis
+- `"general"`: Force exploratory narrative response
+
+See [CODEBASE_GUIDE.md § API Endpoints](CODEBASE_GUIDE.md#api-endpoints) for complete details.
+
+## 🧠 How It Works: 5-Node Graph Workflow
+
+```
+User Query
+  ↓
+[1] PlannerNode
+    └─ Decomposes query → sub_queries, legal_issues, query_type
+  ↓
+[2] RetrievalNode
+    └─ Searches corpus (hybrid dense+sparse) → top-15 unique docs
+  ↓
+[3] ReasonerNode
+    └─ IRAC reasoning → Issue, Rules, Application, Conclusion
+    └─ Scores precedent strengths (0-1)
+  ↓
+[4] ReflectorNode
+    └─ Evaluates confidence (0-1)
+    └─ If confidence < 0.6 & loop_count < 2 → Loop back to [2]
+  ↓
+[5] SynthesisNode
+    └─ Generates structured output
+    └─ Streams narrative response
+  ↓
+Response (JSON + Chat)
+```
+
+See [CODEBASE_GUIDE.md § Agent Workflow](CODEBASE_GUIDE.md#agent-workflow-5-node-graph) for deep dive.
+
+## 📊 Evaluation System
+
+The system includes an automated evaluation framework that measures agent quality across 4 dimensions:
+
+- **Precision**: Relevance of cited precedents
+- **Recall**: Coverage of important precedents
+- **Reasoning**: Correctness and depth of legal explanations
+- **Adverse**: Honest identification of unfavourable precedents
+
+### Run Evaluations
+
+```bash
+python -m evals.runner
+```
+
+- Executes 4 benchmark cases
+- Generates JSON report: `evals/results/report_<timestamp>.json`
+- Prints summary to console
+
+See [CODEBASE_GUIDE.md § Evaluation System](CODEBASE_GUIDE.md#evaluation-system) for details.
+
+## 🛠️ Tech Stack
+
+| Component | Technology | Purpose |
+|-----------|-----------|---------|
+| **Web Framework** | FastAPI 0.111+ | Async REST API |
+| **Query Language** | SQL + SQLAlchemy 2.0 | ORM + async query execution |
+| **Text Storage** | SQLite + aiosqlite | Document metadata, chunks, FTS5 index |
+| **Vector Search** | QdrantDB | Semantic similarity (384-dim embeddings) |
+| **Embeddings** | Sentence-Transformers (all-MiniLM-L6-v2) | 384-dimensional sentence embeddings |
+| **LLM Integration** | OpenAI Python client | Chat completions + streaming |
+| **PDF Parsing** | pdfplumber | Extract text from PDFs |
+| **NLP** | spaCy | Sentence segmentation |
+| **Caching** | Redis (optional) | Query result caching |
+| **Logging** | structlog | Structured JSON logging |
+| **Testing** | pytest + pytest-asyncio | Unit + integration tests |
+
+## 🎓 Key Design Decisions
+
+1. **5-Node Graph** (agent): Explicit workflow nodes are deterministic, auditable, and easier to debug
+2. **Hybrid Retrieval** (dense + sparse + RRF): Combines semantic understanding + keyword precision
+3. **Hierarchical Chunking** (parent + child): Precise retrieval units + rich reasoning context
+4. **IRAC Framework**: Structured legal reasoning with precedent strength scoring
+5. **Reflection Loop**: Confidence-driven refinement (re-search if not confident)
+6. **Single-Server Embedded Stack** (SQLite + QdrantDB): Zero infrastructure, privacy-friendly, fast deployment
+
+See [ADR_001_LEGAL_PRECEDENT_RESEARCH_AGENT.md](ADR_001_LEGAL_PRECEDENT_RESEARCH_AGENT.md) for detailed rationale.
+
+## 🔒 Security & Privacy
+
+- **On-Premise**: All data stays on your server (no cloud dependency)
+- **Correlation IDs**: All requests traced for auditability
+- **Structured Logging**: JSON logs for compliance
+- **CORS Configured**: Frontend at localhost:3000, localhost:5173, or custom domains
+
+## 📦 Deployment
+
+### Local Development
+
+```bash
+# Start the server (reload on code changes)
+python -m uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+### Docker (Single Container - Embedded Mode)
+
+```bash
+# Build image
+docker build -t legal-ai:latest .
+
+# Run with local data persistence
+docker run -p 8000:8000 \
+  -e LLM_API_KEY=sk-... \
+  -v $(pwd)/judgement_pdfs:/app/judgement_pdfs \
+  -v $(pwd)/data:/app/data \
+  legal-ai:latest
+
+# Server will be at http://localhost:8000
+```
+
+### Docker Compose (Full Stack - Recommended for Production)
+
+Includes FastAPI, Qdrant (external), Redis (external), with orchestrated startup and health checks.
+
+```bash
+# Start all services
+docker-compose up -d
+
+# Services available:
+#   API:       http://localhost:8000
+#   Qdrant UI: http://localhost:6333/dashboard
+#   Redis:     localhost:6379
+
+# Ingest documents
+curl -X POST http://localhost:8000/api/v1/ingest
+
+# Stop services
+docker-compose down
+
+# View logs
+docker-compose logs -f api    # API logs
+docker-compose logs -f qdrant # Qdrant logs
+docker-compose logs -f redis  # Redis logs
+```
+
+**Configuration**: docker-compose.yml automatically:
+- Sets `QDRANT_URL=http://qdrant:6333` (internal network)
+- Sets `REDIS_URL=redis://redis:6379` (internal network)
+- Limits OpenBLAS threads to prevent memory issues
+- Memcaps each service at 2GB
+- Persists data in named volumes (`qdrant_data`, `casey_data`)
+
+**Ports**:
+- **8000**: API server
+- **6333**: Qdrant REST API + Web UI
+- **6334**: Qdrant gRPC
+- **6379**: Redis
+
+### Environment-Specific Configuration
+
+For cloud deployment (AWS, GCP, Azure), override `.env` or `docker-compose.yml`:
+
+```bash
+# Use managed Qdrant Cloud
+QDRANT_URL=https://your-cluster.qdrant.io
+QDRANT_API_KEY=your-api-key
+
+# Use managed Redis (e.g., AWS ElastiCache)
+REDIS_URL=redis://:password@redis-endpoint.amazonaws.com:6379
+
+# Use managed LLM (Azure OpenAI)
+LLM_PROVIDER=azure
+LLM_MODEL=gpt-4
+LLM_API_KEY=your-azure-key
+LLM_BASE_URL=https://your-deployment.openai.azure.com/
+```
+
+## 🧪 Testing
+
+```bash
+# Run all tests
+pytest tests/
+
+# Unit tests only
+pytest tests/unit/
+
+# Integration tests
+pytest tests/integration/
+
+# Evaluation tests
+pytest tests/eval/
+
+# With coverage
+pytest --cov=src tests/
+```
+
+## 📖 Documentation
+
+**→ [CODEBASE_GUIDE.md](CODEBASE_GUIDE.md) is the authoritative reference for understanding the entire system.**
+
+Additional resources:
+- [ADR_001](ADR_001_LEGAL_PRECEDENT_RESEARCH_AGENT.md) — Architecture decisions and tradeoffs
+- [Chunking Strategy](chunking-strategy.md) — Hierarchical chunking design
+- [Spec](specs/001-legal-precedent-research-agent/spec.md) — Feature specifications
+- [OpenAPI](specs/001-legal-precedent-research-agent/contracts/api-v1.openapi.yaml) — API specification
+
+## 🐛 Troubleshooting
+
+### Corpus not indexed
+```
+Error: 409 Conflict - CORPUS_NOT_INDEXED
+→ Run: curl -X POST http://localhost:8000/api/v1/ingest
+```
+
+### LLM API key missing
+```
+Error: 503 Service Unavailable - LLM_UNAVAILABLE
+→ Set: export LLM_API_KEY=sk-...
+```
+
+### Query timeout
+```
+Error: Request timed out after 90s
+→ Increase LLM_REQUEST_TIMEOUT in .env
+→ Check if corpus is very large (> 10k docs)
+```
+
 
 
 # Architecture Decision Record (ADR)
