@@ -138,7 +138,6 @@ curl -X POST http://localhost:8000/api/v1/query \
 | [ADR_001_LEGAL_PRECEDENT_RESEARCH_AGENT.md](ADR_001_LEGAL_PRECEDENT_RESEARCH_AGENT.md) | Architecture Decision Record — why key design choices were made |
 | [chunking-strategy.md](chunking-strategy.md) | Hierarchical chunking strategy (section detection + parent/child hierarchy) |
 | [research.md](research.md) | Research notes and explorations |
-| [specs/001-legal-precedent-research-agent/](specs/001-legal-precedent-research-agent/) | Feature specifications and implementation planning |
 
 ## 🏗️ Project Structure
 
@@ -492,7 +491,6 @@ pytest --cov=src tests/
 Additional resources:
 - [ADR_001](ADR_001_LEGAL_PRECEDENT_RESEARCH_AGENT.md) — Architecture decisions and tradeoffs
 - [Chunking Strategy](chunking-strategy.md) — Hierarchical chunking design
-- [Spec](specs/001-legal-precedent-research-agent/spec.md) — Feature specifications
 - [OpenAPI](specs/001-legal-precedent-research-agent/contracts/api-v1.openapi.yaml) — API specification
 
 ## 🐛 Troubleshooting
