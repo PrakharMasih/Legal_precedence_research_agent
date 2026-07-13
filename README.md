@@ -1,4 +1,4 @@
-# Legal AI Project [DEPLOYED LINK](http://110.232.118.90:5500/)
+# Legal AI Project
 
 This repository contains the Legal Precedent Research Agent project.
 
